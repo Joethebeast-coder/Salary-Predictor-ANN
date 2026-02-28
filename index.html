@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Salary Predictor</title>
+
+<style>
+    body {
+        margin: 0;
+        padding: 40px;
+        background-color: #0d1117;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        justify-content: center;
+    }
+
+    .wrapper {
+        width: 100%;
+        max-width: 900px;
+    }
+
+    h1 {
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 25px;
+        font-weight: 500;
+        letter-spacing: 1px;
+    }
+
+    .code-box {
+        background-color: #161b22;
+        border-radius: 12px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        overflow-x: auto;
+    }
+
+    pre {
+        margin: 0;
+        color: #c9d1d9;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .code-box::before {
+        content: "";
+        display: block;
+        height: 4px;
+        background: linear-gradient(90deg, #58a6ff, #bc8cff);
+        border-radius: 12px 12px 0 0;
+        margin: -25px -25px 20px -25px;
+    }
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+    <h1>Salary Predictor AI (Python)</h1>
+
+    <div class="code-box">
+<pre>import random
+import os
+import time
+
+#_____________________Data_____________________________________
+
+rows = []
+with open("C:/Users/josep/Downloads/Employers_data.csv", "r") as f:
+    for line in f:
+        rows.append(line.strip().split(","))
+
+rows.pop(0)
+
+X = []
+Y = []
+
+for row in rows:
+    age = int(row[0]) / 100.0
+    isEngineering = int(row[2]) 
+    isSales = int(row[3])
+    isFinance = int(row[4])
+    isHR = int(row[5])
+    isMarketing = int(row[6])
+    isProduct = int(row[7])
+    experience = int(row[8]) / 100.0
+    hasBachelor = int(row[10])
+    hasMaster = int(row[11])
+    hasPhd = int(row[12])
+    salary = int(row[13])
+    X.append([age, isEngineering, isSales, isFinance, 
+             isHR, isMarketing, isProduct, experience,
+             hasBachelor, hasMaster, hasPhd])
+    Y.append((salary + 20000) / 100000.0)
+
+#_____________________Setting weights__________________________
+
+numinputs = 11
+hiddensize = 10
+
+hidlinearweights1 = [[random.uniform(-1, 1) for i in range(numinputs)] for j in range(hiddensize)]
+hidlinearbias1 = [random.uniform(-1, 1) for i in range(hiddensize)] #Linear neurons only have one bias 
+
+outlinearweights1 = [random.uniform(-1,1) for i in range(hiddensize)]
+outlinearbias1 = random.uniform(-1,1)
+
+#_____________________Setting other learning parameters________
+
+avglinear1error = 999 #Set to run training loop --- This is temporary and will be set to a different value in training
+learning_rate = 0.0001
+alpha = 0.02
+epochlimit = 999
+
+#_____________________Defining Neurons_________________________
+
+def linear(features, weights, biases): #Equation for the linear neuron: w1 * x1 + w1 * x2 ... + b
+    total = 0
+    for i in range(len(features)):
+        total = total + (features[i] * weights[i])
+    total = total + biases
+    return total
+
+def leaky_ReLu(x, alpha):
+    return x if x > 0 else alpha * x
+
+#_____________________Training Loop____________________________
+
+def training(X=X, Y=Y, hiddensize=hiddensize, hidlinearweights1=hidlinearweights1, hidlinearbias1=hidlinearbias1, 
+             outlinearweights1=outlinearweights1, outlinearbias1=outlinearbias1, numinputs=numinputs, alpha=alpha, epochlimit=epochlimit):
+    epoch = 0
+    while epoch != epochlimit:
+        epoch = epoch + 1
+        avglinear1error = 0
+        totlinearerror = 0
+        for sample_i in range(len(X)):
+            features = X[sample_i]
+            targetpred = Y[sample_i]
+
+            hidden_raw = []
+            hidden_outputs = []
+            for i in range(hiddensize):
+                h = linear(features, hidlinearweights1[i], hidlinearbias1[i])
+                hidden_raw.append(h)
+                hidden_outputs.append(leaky_ReLu(h, alpha))
+
+            output = linear(hidden_outputs, outlinearweights1, outlinearbias1)
+            outputerror = output - targetpred
+            totlinearerror = totlinearerror + outputerror ** 2
+            outputgradient = 2 * (output - targetpred)
+            outputweightgradient = [0] * hiddensize
+            for i in range(hiddensize):
+                outputweightgradient[i] = outputgradient * hidden_outputs[i]
+            
+            outputbiasgrad = outputgradient
+            
+            hidweight_grad = [[0 for i in range(numinputs)] for i in range(hiddensize)]
+
+            hidlineargradient = [0] * hiddensize
+            for i in range(hiddensize):
+                hidlineargradient[i] = outlinearweights1[i] * outputgradient
+
+                if hidden_raw[i] > 0:
+                    hidlineargradient[i] = hidlineargradient[i] * 1
+                else:
+                    hidlineargradient[i] = hidlineargradient[i] * alpha
+
+            hidbias_grad = [0] * hiddensize
+            for i in range(hiddensize):
+                for j in range(numinputs):
+                    hidweight_grad[i][j] = hidlineargradient[i] * features[j]
+                hidbias_grad[i] = hidlineargradient[i]
+            
+            for i in range(hiddensize):
+                outlinearweights1[i] = outlinearweights1[i] - learning_rate * outputweightgradient[i]
+            outlinearbias1 = outlinearbias1 - learning_rate * outputbiasgrad
+
+            for i in range(hiddensize):
+                for j in range(numinputs):
+                    hidlinearweights1[i][j] = hidlinearweights1[i][j] - learning_rate * hidweight_grad[i][j]
+                hidlinearbias1[i] = hidlinearbias1[i] - learning_rate * hidbias_grad[i]
+
+
+        
+        avglinear1error = totlinearerror / len(X)
+        if epoch % 1 == 0:
+            print(epoch)
+            print(avglinear1error)
+
+    with open("C:/Users/josep/Documents/weights&biases.txt", "w") as f:
+        for row in hidlinearweights1:
+            f.write(",".join(str(w) for w in row) + "\n")
+        
+        f.write(",".join(str(b) for b in hidlinearbias1) + "\n")
+
+        f.write(",".join(str(w) for w in outlinearweights1) + "\n")
+
+        f.write(str(outlinearbias1) + "\n")
+
+    return hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1, avglinear1error
+
+
+def retreive_weightsbiases(hiddensize=hiddensize):
+    hidlinearweights1 = []
+    hidlinearbias1 = []
+    outlinearweights1 = []
+    outlinearbias1 = 0
+
+    with open("C:/Users/josep/Documents/weights&biases.txt", "r") as f:
+        lines = f.readlines()
+    
+    for i in range(hiddensize):
+        row = [float(x) for x in lines[i].strip().split(",")]
+        hidlinearweights1.append(row)
+    
+    hidlinearbias1 = [float(x) for x in lines[hiddensize].split(",")]
+    outlinearweights1 = [float(x) for x in lines[hiddensize + 1].split(",")]
+    outlinearbias1 = float(lines[hiddensize + 2])
+
+    return hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1
+
+def predict_user(hw1, hb1, olw, olb, hiddensize=hiddensize):
+    while True:
+        userfeatures = []
+        age = input("How old are you? (Type 'x' to exit): ")
+        if age == "x":
+            print("Exiting...")
+            break
+        else:
+            userfeatures.append(int(age) / 100.0)
+        isuserEngineer = input("Are you in the engineering industry? (y/n): ")
+        if isuserEngineer == "y":
+            userfeatures.append(1)
+            for i in range(5):
+                userfeatures.append(0)
+        else:
+            userfeatures.append(0)
+            isuserSales = input("Are you in the sales industry? (y/n): ")
+            if isuserSales == "y":
+                userfeatures.append(1)
+                for i in range(4):
+                    userfeatures.append(0)
+            else:
+                userfeatures.append(0)
+                isuserFinance = input("Are you in the finance industry? (y/n): ")
+                if isuserFinance == "y":
+                    userfeatures.append(1)
+                    for i in range(3):
+                        userfeatures.append(0)
+                else:
+                    userfeatures.append(0)
+                    isuserHR = input("Are you in HR? (y/n): ")
+                    if isuserHR == "y":
+                        userfeatures.append(1)
+                        for i in range(2):
+                            userfeatures.append(0)
+                    else:
+                        userfeatures.append(0)
+                        isuserMarketing = input("Are you in marketing? (y/n): ")
+                        if isuserMarketing == "y":
+                            userfeatures.append(1)
+                            userfeatures.append(0)
+                        else:
+                            userfeatures.append(0)
+                            isuserProduct = input("Are you in product (y/n): ")
+                            if isuserProduct == "y":
+                                userfeatures.append(1)
+                            else:
+                                print("Sorry, this AI model is not suited for your industry...")
+                                break
+        userexperience = int(input("How many years of experience do you have?: "))
+        userfeatures.append(userexperience / 100.0)
+        isuserBachdeg = input("Do you have a bachelor's degree as your highest degree? (y/n): ")
+        if isuserBachdeg == "y":
+            userfeatures.append(1)
+            for i in range(2):
+                userfeatures.append(0)
+        else:
+            userfeatures.append(0)
+            isuserMaster = input("Do you have a master's degree as your highest degree? (y/n): ")
+            if isuserMaster == "y":
+                userfeatures.append(1)
+                userfeatures.append(0)
+            else:
+                userfeatures.append(0)
+                isuserPhD = input("Do you have a PhD as your highest degree? (y/n): ")
+                if isuserPhD == "y":
+                    userfeatures.append(1)
+                else:
+                    print("Sorry, this AI model does not suit your degree type...")
+                    break
+
+        hidden_raw = []
+        hidden_outputs = []
+        for i in range(hiddensize):
+            h = linear(userfeatures, hw1[i], hb1[i])
+            hidden_raw.append(h)
+            hidden_outputs.append(leaky_ReLu(h, alpha))
+
+
+        inference = linear(hidden_outputs, olw, olb) * 100000
+
+        for i in range(1000):
+            print("\n")
+        
+        print("Your predicted salary is...")
+        time.sleep(3)
+        print(f"${round(inference, 2)}")
+    
+    start()
+
+def start(hidlinearweights1=hidlinearweights1, hidlinearbias1=hidlinearbias1, outlinearweights1=outlinearweights1, outlinearbias1=outlinearbias1):
+    if os.path.exists("C:/Users/josep/Documents/weights&biases.txt") and os.path.getsize("C:/Users/josep/Documents/weights&biases.txt") > 0:
+        asktrain = input("Do you want to train the model, it has been previously trained (y/n): ")
+        if asktrain == "y":
+            epochl = int(input("What is the epoch limit?: "))
+            epochlimit = epochl
+            print("Training...")
+            hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1 = retreive_weightsbiases()
+            hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1, avglinear1error = training(hidlinearweights1=hidlinearweights1, hidlinearbias1=
+                                                                                                             hidlinearbias1, outlinearweights1=outlinearweights1,
+                                                                                                             outlinearbias1=outlinearbias1, epochlimit=epochlimit)
+            predict_user(hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1)
+        else:
+            hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1 = retreive_weightsbiases()
+            predict_user(hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1)
+    else:
+        epochl = int(input("What is the epoch limit?: "))
+        epochlimit = epochl        
+        print("Training...")
+        hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1, avglinear1error = training(hidlinearweights1=hidlinearweights1, hidlinearbias1=
+                                                                                                        hidlinearbias1, outlinearweights1=outlinearweights1,
+                                                                                                        outlinearbias1=outlinearbias1, epochlimit=epochlimit)
+        predict_user(hidlinearweights1, hidlinearbias1, outlinearweights1, outlinearbias1)   
+
+start()</pre>
+    </div>
+</div>
+</body>
+</html>
